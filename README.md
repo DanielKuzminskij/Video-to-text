@@ -16,6 +16,7 @@ To use this script, you'll need the following libraries:
 
 ```bash
 pip install whisper ffmpeg-python tqdm numpy
+```
 
 You'll also need to have FFmpeg installed on your system. You can download it [here](https://ffmpeg.org/download.html).
 
@@ -27,6 +28,7 @@ You can run the script using Python. The script will prompt you to select a vide
 
 ```bash
 python video_to_text.py
+```
 
 - **Choose a video file**: A GUI window will appear to select the video file you want to transcribe.
 
@@ -44,6 +46,7 @@ python video_to_text.py
 Початок транскрипції...
 Транскрибування: 100%|██████████████████████████████████████████| 22/22 [03:12<00:00,  8.74s/частин]
 Транскрибований текст збережено у: /path/to/your/output.txt
+```
 
 ## How it Works
 
