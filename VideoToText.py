@@ -1,3 +1,4 @@
+import torch
 import ffmpeg
 import whisper
 import os
@@ -6,6 +7,7 @@ from tkinter.filedialog import askopenfilenames
 import warnings
 from tqdm import tqdm
 import numpy as np
+import subprocess
 
 # Вимикаємо конкретні попередження
 warnings.filterwarnings("ignore", message="FP16 is not supported on CPU")
@@ -26,12 +28,27 @@ def extract_audio_from_video(video_file, output_audio_file):
     except ffmpeg.Error as e:
         print(f"Сталася помилка під час витягнення аудіо: {e}")
 
+def get_video_duration(video_file):
+    """
+    Отримує тривалість відеофайлу у форматі 00:35:27.
+    """
+    try:
+        probe = ffmpeg.probe(video_file)
+        duration = float(probe['format']['duration'])
+        hours, rem = divmod(duration, 3600)
+        minutes, seconds = divmod(rem, 60)
+        return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
+    except ffmpeg.Error as e:
+        print(f"Сталася помилка під час отримання тривалості відео: {e}")
+        return "00:00:00"
+
 def transcribe_audio_in_chunks(audio_file, chunk_duration=30):
     """
     Транскрибує аудіофайл за допомогою моделі Whisper з показом прогрес-бару через tqdm, розбиваючи файл на частини.
+    Використовує тільки CPU.
     """
     try:
-        model = whisper.load_model("medium")  # Використовуємо "medium" для кращої точності
+        model = whisper.load_model("medium")  # Використовуємо "medium" модель
         audio = whisper.load_audio(audio_file)
         audio_duration = audio.shape[-1] / whisper.audio.SAMPLE_RATE
         
@@ -45,6 +62,8 @@ def transcribe_audio_in_chunks(audio_file, chunk_duration=30):
                 start = int(i * chunk_duration * whisper.audio.SAMPLE_RATE)
                 end = int((i + 1) * chunk_duration * whisper.audio.SAMPLE_RATE)
                 audio_chunk = audio[start:end]
+                
+                # Транскрибуємо кожен сегмент на CPU
                 result = model.transcribe(audio_chunk, language='ru')
                 transcribed_text += result['text'] + " "
                 pbar.update(1)
@@ -57,11 +76,14 @@ def transcribe_audio_in_chunks(audio_file, chunk_duration=30):
 def video_to_text(video_file):
     """
     Основна функція для конвертації відео в текст.
-    1. Витягує аудіо з відео.
-    2. Транскрибує аудіо в текст з показом прогрес-бару.
+    Використовує тільки CPU для обробки.
+    Видаляє аудіофайл після завершення.
     """
     output_audio_file = os.path.splitext(video_file)[0] + ".wav"
     output_text_file = os.path.splitext(video_file)[0] + ".txt"
+    
+    video_duration = get_video_duration(video_file)
+    print(f"Тривалість відео: {video_duration}")
     
     extract_audio_from_video(video_file, output_audio_file)
     transcribed_text = transcribe_audio_in_chunks(output_audio_file)
@@ -70,6 +92,11 @@ def video_to_text(video_file):
         f.write(transcribed_text)
     
     print(f"Транскрибований текст збережено у: {output_text_file}")
+    
+    # Видалення аудіофайлу після завершення транскрибування
+    if os.path.exists(output_audio_file):
+        os.remove(output_audio_file)
+        print(f"Аудіофайл видалено: {output_audio_file}")
 
 def choose_files():
     """
@@ -91,7 +118,9 @@ if __name__ == "__main__":
     video_files = choose_files()
     
     if video_files:
-        for video_file in video_files:
+        total_files = len(video_files)
+        for idx, video_file in enumerate(video_files, start=1):
+            print(f"Обробка файлу {idx}/{total_files}: {os.path.basename(video_file)}")
             video_to_text(video_file)
     else:
         print("Операцію скасовано.")
